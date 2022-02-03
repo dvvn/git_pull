@@ -1,16 +1,8 @@
-﻿using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
-using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 
 namespace git_pull;
 
-internal class Worker
+internal class Worker : IDisposable
 {
 	private static async Task ExecuteCmd(string directory)
 	{
@@ -29,7 +21,7 @@ internal class Worker
 		};
 		proc.Start();
 		await proc.WaitForExitAsync();
-		Console.WriteLine($"{directory}{Environment.NewLine}{ await proc.StandardOutput.ReadToEndAsync()}");
+		Console.WriteLine($"{directory}{Environment.NewLine}{await proc.StandardOutput.ReadToEndAsync()}");
 	}
 
 	private static bool IsDirectoryValid(string directory)
@@ -37,24 +29,49 @@ internal class Worker
 		return Directory.EnumerateDirectories(directory).Select(Path.GetFileName).Contains(".git");
 	}
 
-	public static IEnumerable<Task> MakeTasks(string path, string searchPattern = "*", SearchOption searchOption = SearchOption.TopDirectoryOnly)
+	private readonly List<Task> _tasks = new();
+	private readonly uint _maxLevel;
+	private readonly string _rootPath;
+
+	private void Fill(string path, uint level = 0)
 	{
-		foreach (var directory in Directory.EnumerateDirectories(path, searchPattern, searchOption))
+		foreach (var directory in Directory.EnumerateDirectories(path, "*", SearchOption.TopDirectoryOnly))
 		{
 			if (IsDirectoryValid(directory))
-			{
-				yield return ExecuteCmd(directory);
-			}
+				_tasks.Add(ExecuteCmd(directory));
 			else
 			{
-				foreach (var task in MakeTasks(directory, searchPattern, searchOption))
-					yield return task;
+				if (level < _maxLevel)
+					Fill(directory, level + 1);
 			}
 		}
 	}
 
-	public static async Task MakeTask(string path, string searchPattern = "*", SearchOption searchOption = SearchOption.TopDirectoryOnly)
+	public Worker(string path, uint levels = uint.MaxValue)
 	{
-		await Task.WhenAll(MakeTasks(path));
+		Debug.Assert(levels > 0);
+		_rootPath = path;
+		_maxLevel = levels;
+	}
+
+	public Worker(uint levels = uint.MaxValue) : this(Directory.GetCurrentDirectory(), levels)
+	{
+	}
+
+	public void Fill()
+	{
+		Debug.Assert(_tasks.Count == 0);
+		Fill(_rootPath);
+	}
+
+	public void Dispose()
+	{
+		Task.WhenAll(_tasks).Wait();
+		_tasks.Clear();
+	}
+
+	public IEnumerable<Task> AsEnumerable()
+	{
+		return _tasks.AsEnumerable();
 	}
 }

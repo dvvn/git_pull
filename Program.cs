@@ -1,7 +1,32 @@
-﻿// See https://aka.ms/new-console-template for more information
+﻿using git_pull;
 
-using git_pull;
+//----
 
-Worker.MakeTask(/*Directory.GetCurrentDirectory()*/"C:\\Programming\\Projects\\git").Wait();
-Console.WriteLine("Done. Press any key to exit");
+static Worker Init(IReadOnlyList<string> args)
+{
+	return args switch
+	{
+		{Count: 0} => new Worker(),
+		{Count: 1} => uint.TryParse(args[0], out var levels) ? new Worker(levels) : new Worker(args[0]),
+		{Count: 2} => new Worker(args[0], uint.Parse(args[1])),
+		_ => throw new ArgumentException("Incorrect arguments")
+	};
+}
+
+//----
+
+try
+{
+	using var w = Init(args);
+	w.Fill();
+}
+catch (Exception e)
+{
+	Console.WriteLine(e);
+}
+finally
+{
+	Console.WriteLine("Done. Press any key to exit");
+}
+
 Console.ReadKey();
