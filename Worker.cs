@@ -4,7 +4,12 @@ namespace git_pull;
 
 internal class Worker : IDisposable
 {
-	private static async Task ExecuteCmd(string directory)
+	private readonly List<Task> _tasks = new();
+	private readonly int _maxLevel;
+	private readonly string _rootPath;
+	private readonly int _rootPathSkip;
+
+	private async Task ExecuteCmd(string directory)
 	{
 		var procStartInfo = new ProcessStartInfo
 		{
@@ -21,7 +26,7 @@ internal class Worker : IDisposable
 		};
 		proc.Start();
 		await proc.WaitForExitAsync();
-		Console.WriteLine($"{directory}{Environment.NewLine}{await proc.StandardOutput.ReadToEndAsync()}");
+		Console.WriteLine($"\"{directory[_rootPathSkip..]}\"{Environment.NewLine}{await proc.StandardOutput.ReadToEndAsync()}");
 	}
 
 	private static bool IsDirectoryValid(string directory)
@@ -29,11 +34,7 @@ internal class Worker : IDisposable
 		return Directory.EnumerateDirectories(directory).Select(Path.GetFileName).Contains(".git");
 	}
 
-	private readonly List<Task> _tasks = new();
-	private readonly uint _maxLevel;
-	private readonly string _rootPath;
-
-	private void Fill(string path, uint level = 0)
+	private void Fill(string path, int level = 0)
 	{
 		foreach (var directory in Directory.EnumerateDirectories(path, "*", SearchOption.TopDirectoryOnly))
 		{
@@ -47,14 +48,17 @@ internal class Worker : IDisposable
 		}
 	}
 
-	public Worker(string path, uint levels = uint.MaxValue)
+	public Worker(string path, int levels = int.MaxValue)
 	{
 		Debug.Assert(levels > 0);
 		_rootPath = path;
+		_rootPathSkip = path.Length;
+		if (!Path.EndsInDirectorySeparator(path))
+			++_rootPathSkip;
 		_maxLevel = levels;
 	}
 
-	public Worker(uint levels = uint.MaxValue) : this(Directory.GetCurrentDirectory(), levels)
+	public Worker(int levels = int.MaxValue) : this(Directory.GetCurrentDirectory(), levels)
 	{
 	}
 
