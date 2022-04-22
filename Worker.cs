@@ -2,15 +2,18 @@
 
 namespace git_pull;
 
-internal class Worker : IDisposable
+internal class Worker
 {
-    private readonly List<Task> _tasks = new();
+    private readonly List<Task> _tasks = new( );
     private readonly int _maxLevel;
     private readonly string _rootPath;
     private readonly int _rootPathSkip;
 
+    private Task _currentTask = Task.CompletedTask;
+
     private const string AppName = "git";
     private const string Arg = "pull";
+    private const string TargetFolder = ".git";
 
     private async Task ExecuteCmd(string directory)
     {
@@ -24,15 +27,15 @@ internal class Worker : IDisposable
           , CreateNoWindow = true
         };
         using var proc = new Process { StartInfo = procStartInfo, };
-        if (!proc.Start())
-            throw new Exception($"Unable to start the {AppName} process");
-        await proc.WaitForExitAsync();
-        Console.WriteLine($"\"{directory[_rootPathSkip..]}\"{Environment.NewLine}{await proc.StandardOutput.ReadToEndAsync()}");
+        if (!proc.Start( ))
+            throw new($"Unable to start the {AppName} process");
+        await proc.WaitForExitAsync( );
+        Console.WriteLine($"\"{directory[_rootPathSkip..]}\"{Environment.NewLine}{await proc.StandardOutput.ReadToEndAsync( )}");
     }
 
     private static bool IsDirectoryValid(string directory)
     {
-        return Directory.EnumerateDirectories(directory).Select(Path.GetFileName).Contains(".git");
+        return Directory.EnumerateDirectories(directory).Select(Path.GetFileName).Contains(TargetFolder);
     }
 
     private void Fill(string path, int level = 0)
@@ -57,24 +60,26 @@ internal class Worker : IDisposable
     }
 
     public Worker(int levels = int.MaxValue)
-        : this(Directory.GetCurrentDirectory(), levels)
+        : this(Directory.GetCurrentDirectory( ), levels)
     {
     }
 
-    public void Fill( )
+    public void Wait( )
+    {
+        _currentTask.Wait( );
+    }
+
+    public void Run( )
     {
         Debug.Assert(_tasks.Count == 0);
         Fill(_rootPath);
+        Debug.Assert(_currentTask.IsCompleted);
+        _currentTask = Task.WhenAll(_tasks);
     }
 
-    public void Dispose( )
+    public void Clear( )
     {
-        Task.WhenAll(_tasks).Wait();
-        _tasks.Clear();
-    }
-
-    public IEnumerable<Task> AsEnumerable( )
-    {
-        return _tasks.AsEnumerable();
+        Wait( );
+        _tasks.Clear( );
     }
 }
