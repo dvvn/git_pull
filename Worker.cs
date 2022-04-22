@@ -9,20 +9,23 @@ internal class Worker : IDisposable
     private readonly string _rootPath;
     private readonly int _rootPathSkip;
 
+    private const string AppName = "git";
+    private const string Arg = "pull";
+
     private async Task ExecuteCmd(string directory)
     {
         var procStartInfo = new ProcessStartInfo
         {
             WorkingDirectory = directory
-          , FileName = "git"
-          , Arguments = "pull"
+          , FileName = AppName
+          , Arguments = Arg
           , RedirectStandardOutput = true
           , UseShellExecute = false
           , CreateNoWindow = true
-           ,
         };
-        var proc = new Process { StartInfo = procStartInfo, };
-        proc.Start();
+        using var proc = new Process { StartInfo = procStartInfo, };
+        if (!proc.Start())
+            throw new Exception($"Unable to start the {AppName} process");
         await proc.WaitForExitAsync();
         Console.WriteLine($"\"{directory[_rootPathSkip..]}\"{Environment.NewLine}{await proc.StandardOutput.ReadToEndAsync()}");
     }
@@ -37,14 +40,9 @@ internal class Worker : IDisposable
         foreach (var directory in Directory.EnumerateDirectories(path, "*", SearchOption.TopDirectoryOnly))
         {
             if (IsDirectoryValid(directory))
-            {
                 _tasks.Add(ExecuteCmd(directory));
-            }
-            else
-            {
-                if (level < _maxLevel)
-                    Fill(directory, level + 1);
-            }
+            else if (level < _maxLevel)
+                Fill(directory, level + 1);
         }
     }
 

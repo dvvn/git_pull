@@ -6,9 +6,9 @@ static Worker Init(IReadOnlyList<string> args)
 {
     return args.Count switch
     {
-        0 => new Worker()
-      , 1 => int.TryParse(args[0], out var levels) ? new Worker(levels) : new Worker(args[0])
-      , 2 => new Worker(args[0], int.Parse(args[1]))
+        0 => new()
+      , 1 => int.TryParse(args[0], out var levels) ? new(levels) : new(args[0])
+      , 2 => new(args[0], int.Parse(args[1]))
       , _ => throw new ArgumentException("Incorrect arguments count")
     };
 }
